@@ -13,18 +13,33 @@ Description
 Current effects in project:
 
 +++Dynamics+++
+
   Dynamic Range Compressor -- includes typical pro compressor controls: 
       Threshold, Ratio, Attack, Release, Gain, Soft/Hard Knee, Mix(Parallel compression)
+      
   Sustainer -- Simplified 2-knob compressor.  Is also more "open" sounding than the traditional compressor.
 
 +++Modulation+++
+
   Chorus -- includes envelope control options for almost every user-accessible paramter.
+  
   Flanger -- includes envelope control options for almost every user-accessible paramter.
+  
   Phaser
+  
   Tremolo
+
++++Filters+++
+  
+  Wah Wah -- Inductor wah DSP Model (based on classic Vox and Crybaby circuits)
+  
   State Variable filter -- Implements Envelope and sequenced ADSR control
 
 +++Misc+++
+
   Delay (echo) -- includes envelope control options for almost every user-accessible paramter.
+  
   Reverb (http://kokkinizita.linuxaudio.org/ Zita Rev1)
+  
   2x 6-band graphic equalizers
+  
