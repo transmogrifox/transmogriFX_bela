@@ -10,36 +10,44 @@ The contained code is not designed to compile and run outside of the Bela core s
 
 Description
 -------------
+The high-level design strategy is to implement Bela as a mono processor instead of stereo.  Currently Channel 0 includes wah, compressor, sustainer and one of the Equalizers.  Channel 1 includes the modulation and delay effects for post processing.  
+
+Output of Channel 0 then acts as an FX loop send and Channel 1 acts as an FX loop return.  This would be an ideal location to insert dirt boxes.
+
+With current project configuration settings the latency is approximately 1.2ms per channel, so overall latency when using both channels in serial is 2.4ms, or equivalent to standing 2-1/2 ft away from your speaker/guitar amp.  
+
+The latency is too short to be noticed, but too long to mix back in with a "dry" signal.  Mixing with a "dry" signal that was not pre-delayed would create a comb filter with the lowest frequency notch at roughly 800 Hz (it would be like a flanger stuck in a static position like some stompboxes label "filter matrix").
+
 Current effects in project:
 
-+++Dynamics+++
+## Dynamics
 
-  Dynamic Range Compressor -- includes typical pro compressor controls: 
+  ***Dynamic Range Compressor*** -- includes typical pro compressor controls: 
       Threshold, Ratio, Attack, Release, Gain, Soft/Hard Knee, Mix(Parallel compression)
       
-  Sustainer -- Simplified 2-knob compressor.  Is also more "open" sounding than the traditional compressor.
+  ***Sustainer*** -- Simplified 2-knob compressor.  Is also more "open" sounding than the traditional compressor.
 
-+++Modulation+++
+## Modulation
 
-  Chorus -- includes envelope control options for almost every user-accessible paramter.
+  ***Chorus*** -- includes envelope control options for almost every user-accessible paramter.
   
-  Flanger -- includes envelope control options for almost every user-accessible paramter.
+  ***Flanger*** -- includes envelope control options for almost every user-accessible paramter.
   
-  Phaser
+  ***Phaser***  -- default configuration is a 4-stage phaser with the MXR Phase 90 topology.
   
-  Tremolo
+  ***Tremolo*** -- straightforward throbbing effect with several LFO shapes available.
 
-+++Filters+++
+## Filters
   
-  Wah Wah -- Inductor wah DSP Model (based on classic Vox and Crybaby circuits)
+  ***Wah Wah*** -- Inductor wah DSP Model (based on classic Vox and Crybaby circuits)
   
-  State Variable filter -- Implements Envelope and sequenced ADSR control
+  ***State Variable filter*** -- Implements Envelope and sequenced ADSR control
 
-+++Misc+++
+## Misc
 
-  Delay (echo) -- includes envelope control options for almost every user-accessible paramter.
+  ***Delay (echo)*** -- includes envelope control options for almost every user-accessible paramter.
   
-  Reverb (http://kokkinizita.linuxaudio.org/ Zita Rev1)
+  ***Reverb*** (http://kokkinizita.linuxaudio.org/ Zita Rev1)
   
-  2x 6-band graphic equalizers
+  ***2x 6-band graphic equalizers***  Wider-band response hard-coded for zero ripple when all controls are at maximum or minimum.  This also means each band has more spill-over into adjacent bands but this creates a more gentle frequency response curve that seems to be a good fit for balancing electric guitar tones.
   
