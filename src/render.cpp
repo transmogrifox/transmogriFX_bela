@@ -23,6 +23,7 @@ Scope scope;
 #include "fb_compressor.h"
 #include "eq.h"
 #include "envelope_filter.h"
+#include "overdrive.h"
 
 unsigned int gAudioFramesPerAnalogFrame;
 //Global input sample rate variable
@@ -65,6 +66,8 @@ trem_coeffs* trem;
     //Guitar Sustainer: Dynamic range compression -- behaves most like a feedback compressor
     //From Rakarrack source repo
 Sustainer fx_sustain(44100.0);
+	// Overdrive implementation based conceptually on typical guitar stompbox OD like tubescreamer
+overdrive* od;
 	//More explicit feeback compressor implementation
 feedback_compressor* fbcompressor;
     //Reverb from Fons Adriaensen, 
@@ -97,9 +100,10 @@ float *gMaster_Envelope;
 #define SW_CTXT_GEQ2			9
 #define SW_CTXT_ENVF			10
 #define SW_CTXT_FBCOMP			11
+#define SW_CTXT_ODRIVE			12
 //Update number off effects NFX when adding FX
 //Always max in list + 1
-#define NFX						12
+#define NFX						13
 
 #define SW_CTXT_NORM			0
 #define SW_CTXT_ENV				1
@@ -205,6 +209,11 @@ int gNframes = 0;
 #define EF_ADSR_DCY			1
 #define EF_ADSR_RLS			2
 #define EF_ADSR_STN			3
+
+	//Overdrive page 1
+#define OD_DRIVE			0
+#define OD_TONE				1
+#define OD_LEVEL			2
 
 // ----------  End Control page context mappings ----------  //
 
@@ -764,6 +773,67 @@ void set_efx_wah()
 }
 /*
 *  END wah effect settings
+*/
+
+/*
+*  Apply settings from knobs to overdrive effect 
+*  set_efx_overdrive_norm() is the first page of settings, which are normal effect control settings 
+*/
+void set_efx_overdrive_norm()
+{
+	//Apply settings
+
+	float drive, tone, level;
+	drive = tone = level =  0.0;
+
+	if(knobs[OD_DRIVE].active_timer != 0) {
+		drive = map(knobs[OD_DRIVE].filtered_reading[1], 0, 1, 12.0, 45.0);
+		od_set_drive(od, drive);
+		
+		if(rtprintclock >= 20000)
+		{
+			rt_printf("Overdrive: DRIVE: %f\n", drive);
+			rtprintclock = 0;
+		}
+		
+	}
+	if(knobs[OD_TONE].active_timer != 0) {
+		tone = map(knobs[OD_TONE].filtered_reading[1], 0, 1, -12.0, 12.0);
+		od_set_tone(od, tone);
+
+		if(rtprintclock >= 20000)
+		{
+			rt_printf("Overdrive: TONE: %f\n", tone);
+			rtprintclock = 0;
+		}
+		
+	}
+	if(knobs[OD_LEVEL].active_timer != 0) {
+		level = map(knobs[OD_LEVEL].filtered_reading[1], 0, 1, -40.0, 6.0);
+		od_set_level(od, level);
+
+		if(rtprintclock >= 20000)
+		{
+			rt_printf("Overdrive: LEVEL:  %f\n", level);
+			rtprintclock = 0;
+		}
+	}
+}
+
+
+void set_efx_overdrive()
+{
+	switch(fx_cntl[SW_CTXT_WAH].ain_control_context)
+	{
+		case SW_CTXT_ENV:
+		case SW_CTXT_NORM:
+			set_efx_overdrive_norm();
+			break;
+
+	}	
+}
+/*
+*  END overdrive effect settings
 */
 
 /*
@@ -1537,8 +1607,6 @@ void apply_settings()
 					}
 					
 			}
-			
-			
 			break;
 			
 		case SW_CTXT_REVERB :
@@ -1592,7 +1660,24 @@ void apply_settings()
 					
 			}
 			
-			break;		
+			break;	
+		case SW_CTXT_ODRIVE :
+			set_efx_overdrive();
+			if(pushbuttons[EFFECT_BYPASS_SWITCH].rising_edge == true)
+			{
+					pushbuttons[EFFECT_BYPASS_SWITCH].rising_edge = false;
+					if(od_set_bypass(od, false)) // toggle
+					{
+						rt_printf("OVERDRIVE Effect BYPASSED\n");
+					}
+					else
+					{
+						rt_printf("OVERDRIVE Effect ENABLED\n");
+					}
+					
+			}
+			
+			break;	
 		case SW_CTXT_SUSTAIN :	
 			set_efx_sustainer();
 			if(pushbuttons[EFFECT_BYPASS_SWITCH].rising_edge == true)
@@ -1853,6 +1938,8 @@ void process_digital_inputs()
 			rt_printf("Active Effect: ENV FILTER, %d\n", ain_control_effect);
 		else if (ain_control_effect == SW_CTXT_FBCOMP)
 			rt_printf("Active Effect: FB COMPRESSOR, %d\n", ain_control_effect);
+		else if (ain_control_effect == SW_CTXT_ODRIVE)
+			rt_printf("Active Effect: OVERDRIVE, %d\n", ain_control_effect);
 	}
 	
 
@@ -2034,6 +2121,10 @@ bool setup(BelaContext *context, void *userData)
 	//Compressor
 	fbcompressor = make_feedback_compressor(fbcompressor, context->audioSampleRate, gNframes);
 	
+	//Overdrive 
+	od = make_overdrive(od, 1, context->audioFrames, context->audioSampleRate);
+    od_set_bypass(od, true);
+	
 	// Graphic EQ 1
 	geq1 = make_equalizer(geq1, 6, 164.0, 5980.0, context->audioSampleRate);
 	
@@ -2068,12 +2159,10 @@ void render(BelaContext *context, void *userData)
 	//CH0 effects
 	feedback_compressor_tick_n(fbcompressor, ch0, gMaster_Envelope);
 	geq_tick_n(geq1, ch0, gNframes);
-	
 	fx_sustain.tick_n(ch0);
-
 	envf_tick_n(ef, ch1, gMaster_Envelope);
-	
 	iwah_tick_n(iwah, ch0, knobs[EXP_PEDAL].filtered_buf, gNframes);
+	overdrive_tick(od, ch0);
 	trem_tick_n(trem, ch0, gNframes);
 
 	//CH1 effects
