@@ -19,35 +19,36 @@ With current project configuration settings the latency is approximately 1.2ms p
 The latency is too short to be noticed, but too long to mix back in with a "dry" signal.  Mixing with a "dry" signal that was not pre-delayed would create a comb filter with the lowest frequency notch at roughly 800 Hz (it would be like a flanger stuck in a static position like some stompboxes label "filter matrix").
 
 Current effects in project:
+## Distortion
+***Overdrive*** 4x linear over-sampled waveshaper with pre-emphasis, de-emphasis and 1rst-order shelving tone control.
 
 ## Dynamics
 
-  ***Dynamic Range Compressor*** -- includes typical pro compressor controls: 
+  ***Dynamic Range Compressor*** -- includes typical pro compressor controls:
       Threshold, Ratio, Attack, Release, Gain, Soft/Hard Knee, Mix(Parallel compression)
-      
+
   ***Sustainer*** -- Simplified 2-knob compressor.  Is also more "open" sounding than the traditional compressor.
 
 ## Modulation
 
   ***Chorus*** -- includes envelope control options for almost every user-accessible paramter.
-  
+
   ***Flanger*** -- includes envelope control options for almost every user-accessible paramter.
-  
+
   ***Phaser***  -- default configuration is a 4-stage phaser with the MXR Phase 90 topology.
-  
+
   ***Tremolo*** -- straightforward throbbing effect with several LFO shapes available.
 
 ## Filters
-  
+
   ***Wah Wah*** -- Inductor wah DSP Model (based on classic Vox and Crybaby circuits)
-  
+
   ***State Variable filter*** -- Implements Envelope and sequenced ADSR control
 
-## Misc
+  ***Graphic Equalizer*** 6-band graphic equalizers: Low Shelf, 4x mid-bands, High Shelf.  Wider-band response hard-coded for zero ripple when all controls are at maximum or minimum.  This also means each band has more spill-over into adjacent bands but this creates a more gentle frequency response curve that seems to be a good fit for balancing electric guitar tones.
+
+## Ambience
 
   ***Delay (echo)*** -- includes envelope control options for almost every user-accessible paramter.
-  
+
   ***Reverb*** (http://kokkinizita.linuxaudio.org/ Zita Rev1)
-  
-  ***2x 6-band graphic equalizers***  Wider-band response hard-coded for zero ripple when all controls are at maximum or minimum.  This also means each band has more spill-over into adjacent bands but this creates a more gentle frequency response curve that seems to be a good fit for balancing electric guitar tones.
-  
