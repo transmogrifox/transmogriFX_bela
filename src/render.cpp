@@ -24,6 +24,7 @@ Scope scope;
 #include "eq.h"
 #include "envelope_filter.h"
 #include "overdrive.h"
+#include "klingon.h"
 
 unsigned int gAudioFramesPerAnalogFrame;
 //Global input sample rate variable
@@ -68,6 +69,7 @@ trem_coeffs* trem;
 Sustainer fx_sustain(44100.0);
 	// Overdrive implementation based conceptually on typical guitar stompbox OD like tubescreamer
 overdrive* od;
+klingon* ko;
 	//More explicit feeback compressor implementation
 feedback_compressor* fbcompressor;
     //Reverb from Fons Adriaensen, 
@@ -101,9 +103,10 @@ float *gMaster_Envelope;
 #define SW_CTXT_ENVF			10
 #define SW_CTXT_FBCOMP			11
 #define SW_CTXT_ODRIVE			12
+#define SW_CTXT_KLGN			13
 //Update number off effects NFX when adding FX
 //Always max in list + 1
-#define NFX						13
+#define NFX						14
 
 #define SW_CTXT_NORM			0
 #define SW_CTXT_ENV				1
@@ -823,7 +826,7 @@ void set_efx_overdrive_norm()
 
 void set_efx_overdrive()
 {
-	switch(fx_cntl[SW_CTXT_WAH].ain_control_context)
+	switch(fx_cntl[SW_CTXT_ODRIVE].ain_control_context)
 	{
 		case SW_CTXT_ENV:
 		case SW_CTXT_NORM:
@@ -834,6 +837,68 @@ void set_efx_overdrive()
 }
 /*
 *  END overdrive effect settings
+*/
+
+
+/*
+*  Apply settings from knobs to klingon-tone overdrive effect 
+*  set_efx_klingon_norm() is the first page of settings, which are normal effect control settings 
+*/
+void set_efx_klingon_norm()
+{
+	//Apply settings
+
+	float drive, tone, level;
+	drive = tone = level =  0.0;
+
+	if(knobs[OD_DRIVE].active_timer != 0) {
+		drive = map(knobs[OD_DRIVE].filtered_reading[1], 0, 1, 20.0, 45.0);
+		kot_set_drive(ko, drive);
+		
+		if(rtprintclock >= 20000)
+		{
+			rt_printf("Klingon: DRIVE: %f\n", drive);
+			rtprintclock = 0;
+		}
+		
+	}
+	if(knobs[OD_TONE].active_timer != 0) {
+		tone = map(knobs[OD_TONE].filtered_reading[1], 0, 1, -40.0, 0.0);
+		kot_set_tone(ko, tone);
+
+		if(rtprintclock >= 20000)
+		{
+			rt_printf("Klingon: TONE: %f\n", tone);
+			rtprintclock = 0;
+		}
+		
+	}
+	if(knobs[OD_LEVEL].active_timer != 0) {
+		level = map(knobs[OD_LEVEL].filtered_reading[1], 0, 1, -40.0, 0.0);
+		kot_set_level(ko, level);
+
+		if(rtprintclock >= 20000)
+		{
+			rt_printf("Klingon: LEVEL:  %f\n", level);
+			rtprintclock = 0;
+		}
+	}
+}
+
+
+void set_efx_klingon()
+{
+	switch(fx_cntl[SW_CTXT_KLGN].ain_control_context)
+	{
+		case SW_CTXT_ENV:
+		case SW_CTXT_NORM:
+			set_efx_klingon_norm();
+			break;
+
+	}	
+}
+/*
+*  END klingon effect settings
 */
 
 /*
@@ -1678,6 +1743,23 @@ void apply_settings()
 			}
 			
 			break;	
+		case SW_CTXT_KLGN :
+			set_efx_klingon();
+			if(pushbuttons[EFFECT_BYPASS_SWITCH].rising_edge == true)
+			{
+					pushbuttons[EFFECT_BYPASS_SWITCH].rising_edge = false;
+					if(kot_set_bypass(ko, false)) // toggle
+					{
+						rt_printf("KLINGON Effect BYPASSED\n");
+					}
+					else
+					{
+						rt_printf("KLINGON Effect ENABLED\n");
+					}
+					
+			}
+			
+			break;		
 		case SW_CTXT_SUSTAIN :	
 			set_efx_sustainer();
 			if(pushbuttons[EFFECT_BYPASS_SWITCH].rising_edge == true)
@@ -1823,8 +1905,6 @@ void scan_inputs(BelaContext* context)
 		
 	}
 	
-
-	
 	//Reset virtual multiplexer
 	if(++gRoundRobin >= ANALOG_CHANNELS) {
 		gRoundRobin = 0;	
@@ -1940,6 +2020,8 @@ void process_digital_inputs()
 			rt_printf("Active Effect: FB COMPRESSOR, %d\n", ain_control_effect);
 		else if (ain_control_effect == SW_CTXT_ODRIVE)
 			rt_printf("Active Effect: OVERDRIVE, %d\n", ain_control_effect);
+		else if (ain_control_effect == SW_CTXT_KLGN)
+			rt_printf("Active Effect: KLINGON TONE, %d\n", ain_control_effect);
 	}
 	
 
@@ -2079,7 +2161,7 @@ bool setup(BelaContext *context, void *userData)
 	}
 	//initialize LFO shapes for each effect 
 	gDLY_lfo_type = SINE;
-	gCHOR_lfo_type = RELAX;
+	gCHOR_lfo_type = INT_TRI;
 	gFLANGE_lfo_type = EXP;
 
 	//Analog input control context
@@ -2124,6 +2206,10 @@ bool setup(BelaContext *context, void *userData)
 	//Overdrive 
 	od = make_overdrive(od, 1, context->audioFrames, context->audioSampleRate);
     od_set_bypass(od, true);
+
+	//Klingon-Tone 
+	ko = make_klingon(ko, 1, context->audioFrames, context->audioSampleRate);
+    kot_set_bypass(ko, true);
 	
 	// Graphic EQ 1
 	geq1 = make_equalizer(geq1, 6, 164.0, 5980.0, context->audioSampleRate);
@@ -2163,6 +2249,7 @@ void render(BelaContext *context, void *userData)
 	envf_tick_n(ef, ch1, gMaster_Envelope);
 	iwah_tick_n(iwah, ch0, knobs[EXP_PEDAL].filtered_buf, gNframes);
 	overdrive_tick(od, ch0);
+	klingon_tick(ko, ch0);
 	trem_tick_n(trem, ch0, gNframes);
 
 	//CH1 effects

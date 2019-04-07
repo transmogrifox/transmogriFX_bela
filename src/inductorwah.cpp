@@ -326,8 +326,7 @@ iwah_tick(float x, float gp, iwah_coeffs* cf)
     if(gp < 0.0) gp = 0.0;
     
     //The magic numbers below approximate frequency warping characteristic
-    //float gw = 4.6-18.4/(4.0 + gp);
-    float gw = gp * (1.15 - 0.235*gp); //Approximation of the approximation
+    float gw = 4.6-18.4/(4.0 + gp);
                             
     //Update Biquad coefficients
     cf->a0 = cf->a0b + gw*cf->a0c;

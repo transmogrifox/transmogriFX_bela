@@ -3,67 +3,6 @@
 
 #include "overdrive.h"
 
-//
-// First order high-pass and low-pass filters.
-//
-
-void compute_filter_coeffs(iir_1p* cf, unsigned int type, float fs, float f0)
-{
-    float w0 = 2.0*M_PI*f0/fs;
-    float a1;
-    float b0, b1;
-    float g = 1.0;  // This could be brought out into a user-configurable param
-
-    switch(type){
-    	 default:
-         case LPF1P:
-            //1-pole high pass filter coefficients
-            // H(z) = g * (1 - z^-1)/(1 - a1*z^-1)
-            // Direct Form 1:
-            //    h[n] = g * ( b0*x[n] - b1*x[n-1] ) - a1*y[n-1]
-            // In below implementation gain is redistributed to the numerator:
-            //    h[n] = gb0*x[n] - gb1*x[n-1] - a1*y[n-1]
-            a1 = -expf(-w0);
-            g = (1.0 + a1)/1.12;
-            b0 = g;
-            b1 = 0.12*g; //0.12 zero improves RC filter emulation at higher freqs.
-            break;
-         case HPF1P:
-            //1-pole high pass filter coefficients
-            // H(z) = g * (1 - z^-1)/(1 - a1*z^-1)
-            // Direct Form 1:
-            //    h[n] = g * ( b0*x[n] -  b1*x[n-1] ) - a1*y[n-1]
-            // In below implementation gain is redistributed to the numerator:
-            //    h[n] = g*x[n] - g*x[n-1] - a1*y[n-1]
-            a1 = -expf(-w0);
-            g = (1.0 - a1)*0.5;
-            b0 = g;
-            b1 = -g;
-            break;
-
-    }
-
-
-    cf->b0 = b0;
-    cf->b1 = b1;
-    cf->a1 = -a1;  // filter implementation uses addition instead of subtraction
-
-    cf->y1 = 0.0;
-    cf->x1 = 0.0;
-
-}
-
-//
-// Execute the 1rst-order IIR difference equation
-// 
-
-inline float tick_filter_1p(iir_1p* f, float x)
-{
-    f->y1 = f->b0*x + f->b1*f->x1 + f->a1*f->y1;
-    f->x1 = x;
-    return f->y1;
-}
-
 // Allocate the overdrive struct and set default values
 overdrive* make_overdrive(overdrive* od, unsigned int oversample, unsigned int bsz, float fs)
 {
@@ -91,12 +30,12 @@ overdrive* make_overdrive(overdrive* od, unsigned int oversample, unsigned int b
     od->bypass = true;
 
     // Setup EQ stages
-    compute_filter_coeffs(&(od->anti_alias), LPF1P, od->clipper_fs, 4410.0);  // 1/10th fs assuming 44.1k rate -- increasing filter order will help
+    compute_filter_coeffs_1p(&(od->anti_alias), LPF1P, od->clipper_fs, 4410.0);  // 1/10th fs assuming 44.1k rate -- increasing filter order will help
                                                                               // down-play any aliasing artefacts, but increases CPU usage
-    compute_filter_coeffs(&(od->pre_emph), HPF1P, od->fs, 720.0);
-    compute_filter_coeffs(&(od->post_emph), LPF1P, od->clipper_fs, 860.0);
-    compute_filter_coeffs(&(od->tone_lp), LPF1P, od->fs, 1200.0);
-    compute_filter_coeffs(&(od->tone_hp), HPF1P, od->fs, 1700.0);
+    compute_filter_coeffs_1p(&(od->pre_emph), HPF1P, od->fs, 720.0);
+    compute_filter_coeffs_1p(&(od->post_emph), LPF1P, od->clipper_fs, 860.0);
+    compute_filter_coeffs_1p(&(od->tone_lp), LPF1P, od->fs, 1200.0);
+    compute_filter_coeffs_1p(&(od->tone_hp), HPF1P, od->fs, 1700.0);
 
     return od;
 }
@@ -223,22 +162,22 @@ void cubic_clip(overdrive* od, int N, float asym, float* x, float* clean)
 // configuring the type of overdrive
 void od_set_cut_pre_emp(overdrive* od, float fc)
 {
-    compute_filter_coeffs(&(od->pre_emph), HPF1P, od->fs, fc);
+    compute_filter_coeffs_1p(&(od->pre_emph), HPF1P, od->fs, fc);
 }
 
 void od_set_cut_post_emp(overdrive* od, float fc)
 {
-    compute_filter_coeffs(&(od->post_emph), HPF1P, od->fs, fc);
+    compute_filter_coeffs_1p(&(od->post_emph), HPF1P, od->fs, fc);
 }
 
 void od_set_cut_tone_lp(overdrive* od, float fc)
 {
-    compute_filter_coeffs(&(od->tone_lp), HPF1P, od->fs, fc);
+    compute_filter_coeffs_1p(&(od->tone_lp), HPF1P, od->fs, fc);
 }
 
 void od_set_cut_tone_hp(overdrive* od, float fc)
 {
-    compute_filter_coeffs(&(od->tone_hp), HPF1P, od->fs, fc);
+    compute_filter_coeffs_1p(&(od->tone_hp), HPF1P, od->fs, fc);
 }
 
 // Typical real-time user-configurable parameters
