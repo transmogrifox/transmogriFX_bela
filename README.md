@@ -20,7 +20,9 @@ The latency is too short to be noticed, but too long to mix back in with a "dry"
 
 Current effects in project:
 ## Distortion
-***Overdrive*** 4x linear over-sampled waveshaper with pre-emphasis, de-emphasis and 1rst-order shelving tone control.
+***Overdrive*** -- 4x linear over-sampled waveshaper with pre-emphasis, de-emphasis and 1rst-order shelving tone control.
+
+***Klingon-Tone*** --  Freely roll your eyes.  This is a shameless knock-off of an overdrive pedal that sounds phonetically similar to "Klingon".  In its current state the EQ stages are correct to the original circuit except for the tone.  The tonestack is approximated.  A good sound can be had from this module but there is no claim being made that this is a faithful emulation of the original. 
 
 ## Dynamics
 
@@ -28,6 +30,8 @@ Current effects in project:
       Threshold, Ratio, Attack, Release, Gain, Soft/Hard Knee, Mix(Parallel compression)
 
   ***Sustainer*** -- Simplified 2-knob compressor.  Is also more "open" sounding than the traditional compressor.
+
+  ***Envelope Filter*** -- Envelope control of State Variable Filter (see below).
 
 ## Modulation
 
@@ -45,10 +49,10 @@ Current effects in project:
 
   ***State Variable filter*** -- Implements Envelope and sequenced ADSR control
 
-  ***Graphic Equalizer*** 6-band graphic equalizers: Low Shelf, 4x mid-bands, High Shelf.  Wider-band response hard-coded for zero ripple when all controls are at maximum or minimum.  This also means each band has more spill-over into adjacent bands but this creates a more gentle frequency response curve that seems to be a good fit for balancing electric guitar tones.
+  ***Graphic Equalizer*** -- 6-band graphic equalizers: Low Shelf, 4x mid-bands, High Shelf.  Wider-band response hard-coded for zero ripple when all controls are at maximum or minimum.  This also means each band has more spill-over into adjacent bands but this creates a more gentle frequency response curve that seems to be a good fit for balancing electric guitar tones.
 
 ## Ambience
 
   ***Delay (echo)*** -- includes envelope control options for almost every user-accessible paramter.
 
-  ***Reverb*** (http://kokkinizita.linuxaudio.org/ Zita Rev1)
+  ***Reverb*** -- (http://kokkinizita.linuxaudio.org/ Zita Rev1)
