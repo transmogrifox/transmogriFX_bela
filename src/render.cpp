@@ -217,6 +217,7 @@ int gNframes = 0;
 #define OD_DRIVE			0
 #define OD_TONE				1
 #define OD_LEVEL			2
+#define OD_BOOST            4
 
 // ----------  End Control page context mappings ----------  //
 
@@ -848,11 +849,11 @@ void set_efx_klingon_norm()
 {
 	//Apply settings
 
-	float drive, tone, level;
-	drive = tone = level =  0.0;
+	float drive, tone, level, boost;
+	drive = tone = level = boost = 0.0;
 
 	if(knobs[OD_DRIVE].active_timer != 0) {
-		drive = map(knobs[OD_DRIVE].filtered_reading[1], 0, 1, 20.0, 45.0);
+		drive = map(knobs[OD_DRIVE].filtered_reading[1], 0, 1, 12.0, 45.0);
 		kot_set_drive(ko, drive);
 		
 		if(rtprintclock >= 20000)
@@ -880,6 +881,16 @@ void set_efx_klingon_norm()
 		if(rtprintclock >= 20000)
 		{
 			rt_printf("Klingon: LEVEL:  %f\n", level);
+			rtprintclock = 0;
+		}
+	}
+		if(knobs[OD_BOOST].active_timer != 0) {
+		boost = map(knobs[OD_BOOST].filtered_reading[1], 0, 1, 0.0, 1.0);
+		kot_set_boost(ko, boost);
+
+		if(rtprintclock >= 20000)
+		{
+			rt_printf("Klingon: BOOST:  %f\n", level);
 			rtprintclock = 0;
 		}
 	}
@@ -2253,10 +2264,10 @@ void render(BelaContext *context, void *userData)
 	trem_tick_n(trem, ch0, gNframes);
 
 	//CH1 effects
+	tflanger_tick(delayline, gNframes, ch1, gMaster_Envelope);
 	tflanger_tick(chorus, gNframes, ch1, gMaster_Envelope);
 	tflanger_tick(flanger, gNframes, ch1, gMaster_Envelope);
 	phaser_tick_n(phaser, gNframes, ch1);
-	tflanger_tick(delayline, gNframes, ch1, gMaster_Envelope);
 	zita1.tick_mono(gNframes, ch1);
 	
 	
@@ -2264,7 +2275,7 @@ void render(BelaContext *context, void *userData)
 		if(startup_mask_timer > 0) 
 			startup_mask_timer--;
 		//scope.log(gMaster_Envelope[n], ch0[n]);
-		scope.log(ch0[n], ch1[n]);
+		//scope.log(ch0[n], ch1[n]);
 		audioWrite(context, n, 0, ch0[n]);
 		audioWrite(context, n, 1, ch1[n]);
 	}	
