@@ -3,6 +3,7 @@
 //  Approximate voicing of King of Tone overdrive pedal
 //
 
+#include "read_vi_trace.h"
 #include "iir_1pole.h"
 #include "kot_tonestack.h"
 
@@ -29,7 +30,6 @@ typedef struct klingon_t
 
     // State variables
     float xn1;
-    float xc1;
 
     // Pre and post emphasis EQ
     iir_1p anti_alias;
@@ -40,12 +40,14 @@ typedef struct klingon_t
 
 	// Tonestack
 	kot_stack stack;
+	
+	// Clipping look-up function
+	vi_trace clip;
 
     // Gain stages
     float g482;  // first stage pre-emphasis 1 gain
     float g589;  // first stage pre-emphasis 2 gain
     float g159;  // second stage pre-emphais gain
-    float gclip; // gain when diodes are fully on
 
 } klingon;
 

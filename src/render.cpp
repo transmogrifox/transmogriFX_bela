@@ -890,7 +890,7 @@ void set_efx_klingon_norm()
 
 		if(rtprintclock >= 20000)
 		{
-			rt_printf("Klingon: BOOST:  %f\n", level);
+			rt_printf("Klingon: BOOST:  %f\n", boost);
 			rtprintclock = 0;
 		}
 	}

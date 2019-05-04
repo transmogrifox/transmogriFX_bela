@@ -8,13 +8,16 @@ klingon* make_klingon(klingon* kot, unsigned int oversample, unsigned int bsz, f
 {
     kot = (klingon*) malloc(sizeof(klingon));
     kot->procbuf = (float*) malloc(sizeof(float)*bsz*oversample);
+    
+    // Set up interpolation table
+    const char* fname = "export_clipper_vi_curve.txt";
+    load_vi_data(&(kot->clip), (char*) fname);
 
     for(int i=0; i<bsz; i++)
     {
         kot->procbuf[i] = 0.0;
     }
     kot->xn1 = 0.0;
-    kot->xc1 = 0.0;
 
     kot->blksz = bsz;
     kot->oversample = oversample;
@@ -56,17 +59,17 @@ klingon* make_klingon(klingon* kot, unsigned int oversample, unsigned int bsz, f
     float fc_ff = 1.0/(2.0*M_PI*1000.0*pot_ff*c_ff);     // High-pass cut-off
     
     compute_filter_coeffs_1p(&(kot->pre_emph159), HPF1P, kot->fs, fc_ff);
-    compute_filter_coeffs_1p(&(kot->post_emph), LPF1P, kot->clipper_fs, fc_fb);
+    compute_filter_coeffs_1p(&(kot->post_emph), LPF1P, kot->fs, fc_fb);
     
     //Second stage gains
-    kot->g159 = 220.0/pot_ff;  // 220k/(10k + (1-x)*100k), ratio of 100k gain pot
-    kot->gclip = 6.8/pot_ff;   // 6.8k/(10k + (1-x)*100k), ratio of 100k gain pot
+    kot->g159 = 1.0e-3/pot_ff;  // Curent fed into second stage amp 1/(10k + (1-x)*100k), ratio of 100k gain pot
 
     return kot;
 }
 
 void klingon_cleanup(klingon* kot)
 {
+	vi_trace_cleanup(&(kot->clip));
     free(kot->procbuf);
     free(kot);
 }
@@ -78,69 +81,39 @@ inline float sqr(float x)
 
 //
 // Clipping functions
+//  Nonlinear function applied by Lagrange interpolation of look-up mutable
+//  Voltage/Current function (usually exported from SPICE)
 //
 
-// Quadratic clipping function
-// Linear between nthrs and thrs, uses x - a*x^2 type of function above threshold
 
 void clipper_tick(klingon* kot, int N, float* x, float* clean)  // Add in gain processing and dry mix
 {
-	// Hard-coded constants
-	static const float kthrs = 0.8;
-	static const float knthrs = -0.72;
-	static const float kf=1.25;
 
 	float xn = 0.0;
-	float cn = 0.0;
 	float dx = 0.0;
-	float dc = 0.0;
 	float delta = 0.0;
-	float deltac = 0.0;
 
     for(int i=0; i<N; i++)
     {
     	// Compute deltas for linear interpolation (upsampling)
     	dx = (x[i] - kot->xn1)*kot->inverse_oversample_float;
-    	dc = (clean[i] - kot->xc1)*kot->inverse_oversample_float;
     	
     	// Run clipping function at higher sample rate
     	for(int n = 0; n < kot->oversample; n++)
     	{
     		xn = kot->xn1 + delta; // Linear interpolation up-sampling
-    		cn = kot->xc1 + deltac; // Upsample clean signal for mix
     		delta += dx;
-    		deltac += dc;
     		
-	        //Hard limiting, roughly 2 Si diode drops 1 way, and Si + Schottky other way, 
-	        if(xn >= 1.2) xn = 1.2;
-	        else if(xn <= -1.12) xn = -1.12;
-	        
+    		// Run nonlinear function defined from text file
+    		xn = vi_trace_interp(&(kot->clip), xn);
 
-	        //Soft clipping
-	        if(xn > kthrs)
-	            xn -= kf*sqr(xn - kthrs);
-	        if(xn < knthrs)
-	            xn += kf*sqr(xn - knthrs);
-	        
-	        // Second gain stage op amp clipping if driven hard
-	        xn += kot->dry*cn;
-	        if(xn > 3.2)
-	        	xn = 3.2;
-        	else if (xn < -3.2)
-        		xn = -3.2;
-        		
-	        // Pre-filter for down-sampling
-	        // Run de-emphasis and anti-aliasing filters
-	        xn = tick_filter_1p(&(kot->post_emph), xn);  // Strictly would appear before first stage clipping,
-	                                                     // but filter used here for anti-aliasing
+	        // Run anti-aliasing filter
 	        xn = tick_filter_1p(&(kot->anti_alias), xn);
     	}
 
     	// Reset linear interpolator state variables
     	kot->xn1 = x[i];
-    	kot->xc1 = clean[i];
 	    delta = 0.0;
-	    deltac = 0.0;
 
 	    // Zero-order hold downsampling assumes de-emphasis filter and anti-aliasing
 	    // filters sufficiently rejected harmonics > 1/2 base sample rate
@@ -184,8 +157,7 @@ void kot_set_drive(klingon* kot, float drive_db)   // 0 dB to 45 dB
     compute_filter_coeffs_1p(&(kot->pre_emph159), HPF1P, kot->fs, fc_ff);
 
     //Second stage gains
-    kot->g159 = 220.0/pot_ff;  // 220k/(10k + (1-x)*100k), ratio of 100k gain pot
-    kot->gclip = 6.8/pot_ff;   // 6.8k/(10k + (1-x)*100k), ratio of 100k gain pot
+    kot->g159 = 1.0e-3/pot_ff;  // 220k/(10k + (1-x)*100k), ratio of 100k gain pot
     
 }
 
@@ -272,11 +244,9 @@ void klingon_tick(klingon* kot, float* x)
         kot->procbuf[i] = tick_filter_1p(&(kot->pre_emph589), kot->g589*x[i]);
         kot->procbuf[i] += tick_filter_1p(&(kot->pre_emph482), kot->g482*x[i]);
         kot->procbuf[i] *= kot->gain;
-        kot->procbuf[i] += x[i];
-        /* Op amp hard clipping would be implemented here if thought to make an audible difference */
+        kot->procbuf[i] = x[i] + tick_filter_1p(&(kot->post_emph), kot->procbuf[i]);
         x[i] = tick_filter_1p(&(kot->pre_emph159), kot->procbuf[i]);
-        kot->procbuf[i] = x[i]*kot->g159;
-        x[i] *= kot->gclip;  // This stores the clean portion of the mix
+        kot->procbuf[i] = x[i]*kot->g159;  // Current fed into second op amp inverting terminal
     }
 
     // Run the clipper
