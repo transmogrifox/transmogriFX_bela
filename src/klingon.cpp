@@ -10,8 +10,12 @@ klingon* make_klingon(klingon* kot, unsigned int oversample, unsigned int bsz, f
     kot->procbuf = (float*) malloc(sizeof(float)*bsz*oversample);
     
     // Set up interpolation table
-    const char* fname = "export_clipper_vi_curve.txt";
-    load_vi_data(&(kot->clip), (char*) fname);
+    const char* soft_file = "soft_clip.txt";
+    const char* hard_file = "hard_clip.txt";
+    const char* limit_file = "output_limit.txt";
+    load_vi_data(&(kot->clip), (char*) soft_file);
+    load_vi_data(&(kot->hard_clip), (char*) hard_file);
+    load_vi_data(&(kot->output_limit), (char*) limit_file);
 
     for(int i=0; i<bsz; i++)
     {
@@ -28,7 +32,7 @@ klingon* make_klingon(klingon* kot, unsigned int oversample, unsigned int bsz, f
     // Set defaults
     kot->gain = 50.0;
     kot->tone = 0.5; // Not used -- initialized in tonestack
-    kot->dry = 1.0;
+    kot->hard = 0.0;
     kot->level = 0.5;
     kot->bypass = true;
 
@@ -59,7 +63,7 @@ klingon* make_klingon(klingon* kot, unsigned int oversample, unsigned int bsz, f
     float fc_ff = 1.0/(2.0*M_PI*1000.0*pot_ff*c_ff);     // High-pass cut-off
     
     compute_filter_coeffs_1p(&(kot->pre_emph159), HPF1P, kot->fs, fc_ff);
-    compute_filter_coeffs_1p(&(kot->post_emph), LPF1P, kot->fs, fc_fb);
+    compute_filter_coeffs_1p(&(kot->post_emph), LPF1P, kot->clipper_fs, fc_fb);
     
     //Second stage gains
     kot->g159 = 1.0e-3/pot_ff;  // Curent fed into second stage amp 1/(10k + (1-x)*100k), ratio of 100k gain pot
@@ -92,6 +96,7 @@ void clipper_tick(klingon* kot, int N, float* x, float* clean)  // Add in gain p
 	float xn = 0.0;
 	float dx = 0.0;
 	float delta = 0.0;
+	float tmp = 0.0;
 
     for(int i=0; i<N; i++)
     {
@@ -101,11 +106,21 @@ void clipper_tick(klingon* kot, int N, float* x, float* clean)  // Add in gain p
     	// Run clipping function at higher sample rate
     	for(int n = 0; n < kot->oversample; n++)
     	{
-    		xn = kot->xn1 + delta; // Linear interpolation up-sampling
+    		xn = tick_filter_1p(&(kot->post_emph), kot->xn1 + delta); // Linear interpolation up-sampling
     		delta += dx;
     		
+    		if(xn > 300.0e-6) 
+    			xn = 300.0e-6;
+    		if(xn < -300.0e-6) 
+    			xn = -300.0e-6;
+    			
+    		tmp = xn;
+    		
     		// Run nonlinear function defined from text file
-    		xn = vi_trace_interp(&(kot->clip), xn);
+    		xn = vi_trace_interp(&(kot->clip), tmp);
+    		tmp = vi_trace_interp(&(kot->hard_clip), tmp);
+    		
+    		xn = kot->hard*tmp + (1.0 - kot->hard)*xn;
 
 	        // Run anti-aliasing filter
 	        xn = tick_filter_1p(&(kot->anti_alias), xn);
@@ -188,16 +203,16 @@ void kot_set_boost(klingon* kot, float boost) // second high pass cut
     kotstack_set_boost(&(kot->stack), boost);
 }
 
-void kot_set_mix(klingon* kot, float dry)  // Dry/Wet control, 0.0 to 1.0
+void kot_set_mix(klingon* kot, float hard)  // Dry/Wet control, 0.0 to 1.0
 {
-	float mix = dry;
-	if(dry > 1.0)
+	float mix = hard;
+	if(hard > 1.0)
 		mix = 1.0;
-	else if (dry < 0.0)
+	else if (hard < 0.0)
 		mix = 0.0;
 	else
-		mix = dry;
-	kot->dry = mix;
+		mix = hard;
+	kot->hard = mix;
 }
 
 void kot_set_level(klingon* kot, float outlevel_db) // -40 dB to +0 dB
@@ -244,17 +259,19 @@ void klingon_tick(klingon* kot, float* x)
         kot->procbuf[i] = tick_filter_1p(&(kot->pre_emph589), kot->g589*x[i]);
         kot->procbuf[i] += tick_filter_1p(&(kot->pre_emph482), kot->g482*x[i]);
         kot->procbuf[i] *= kot->gain;
-        kot->procbuf[i] = x[i] + tick_filter_1p(&(kot->post_emph), kot->procbuf[i]);
+        kot->procbuf[i] += x[i];
         x[i] = tick_filter_1p(&(kot->pre_emph159), kot->procbuf[i]);
         kot->procbuf[i] = x[i]*kot->g159;  // Current fed into second op amp inverting terminal
     }
 
     // Run the clipper
-    clipper_tick(kot, n, kot->procbuf, x);  // Quadratic function: x - a*x^2
+    clipper_tick(kot, n, kot->procbuf, x);  //
 
     // Output level and tone control
     for(int i = 0; i<n; i++)
     {
     	x[i] = kot->level*kotstack_tick(&(kot->stack), kot->procbuf[i]);
+    	x[i] = vi_trace_interp(&(kot->output_limit), x[i]); //limit to -1.0 to 1.0, but more gracefully than digital clip/limit
+    	
     }
 }
