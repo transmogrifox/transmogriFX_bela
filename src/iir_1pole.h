@@ -65,4 +65,33 @@ inline float tick_filter_biquad(iir_1p* f, float x)
     return yn*f->gain;
 }
 
+//
+// Compute bilinear transform on s-domain biquad
+//
+// Input s-domain biquad coefficients + filter gain
+// Replaces num/den arrays with z-domain biquad coefficients
+// Computed via Bilinear Transform
+//
+// sgain : Gain of s-domain transfer function or system linear gains to be 
+//         distributed into z-domain coefficients
+// fs_   : DSP system sampling rate
+// kz_   : Frequency warping coefficient, or 0.0 for default
+// num   : Biquad numerator:    num[2]*s^2 + num[1]*s + num[0]
+// den   : Buquad denominator:  den[2]*s^2 + den[1]*s + den[0]
+//
+// den[1] and den[2] are negated for difference equation implementation in 
+// MAC hardware (all operations summation).
+//
+// den[0] is always set to 0 for the z-domain biquad form.
+//
+// The intended difference equation implementation is of the following format:
+// y[n] =   x[n-2]*num[2] + x[n-1]*num[1] + x[n]*num[0]
+//        + y[n-2]*den[2] + y[n-1]*den[1]
+//
+// Default usage example:
+//   s_biquad_to_z_biquad(sgain, fs, 0.0, num, den);
+//
+
+void s_biquad_to_z_biquad(float sgain, float fs_, float kz_, float* num, float* den);
+
 #endif //IIR1P_H

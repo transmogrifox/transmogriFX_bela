@@ -33,6 +33,7 @@ typedef struct klingon_t
 
     // Pre and post emphasis EQ
     iir_1p anti_alias;
+    iir_1p pre_emph_biquad;
     iir_1p pre_emph589;
     iir_1p pre_emph482;
     iir_1p pre_emph159;
@@ -64,6 +65,9 @@ void kot_set_boost(klingon* kot, float boost);  // Boost pot control, 0.0 to 1.0
 void kot_set_mix(klingon* kot, float hard);  // Hard/Soft control, 0.0 to 1.0
 void kot_set_level(klingon* kot, float outlevel_db); // -40 dB to +0 dB
 bool kot_set_bypass(klingon* kot, bool bypass);
+
+// Reconfigure first stage pre-emphasis filter
+void compute_s_biquad(float r1, float r2, float c1, float c2, float* num, float* den);
 
 // Run the klingon effect
 void klingon_tick(klingon* kot, float* x);

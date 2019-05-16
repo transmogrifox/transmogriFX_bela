@@ -86,3 +86,57 @@ void iir_get_response(iir_1p* cf, float n, float fstart, float fstop, float* frq
         fi += fstep;
     }
 }
+
+
+//
+// Input s-domain biquad coefficients + filter gain
+// Replaces num/den arrays with z-domain biquad coefficients
+// Computed via Bilinear Transform
+//
+// sgain : Gain of s-domain transfer function or system linear gains to be 
+//         distributed into z-domain coefficients
+// fs_   : DSP system sampling rate
+// kz_   : Frequency warping coefficient, or 0.0 for default
+// num   : Biquad numerator:    num[2]*s^2 + num[1]*s + num[0]
+// den   : Buquad denominator:  den[2]*s^2 + den[1]*s + den[0]
+//
+// den[1] and den[2] are negated for difference equation implementation in 
+// MAC hardware (all operations summation).
+//
+// den[0] is always set to 0 for the z-domain biquad form.
+//
+// The intended difference equation implementation is of the following format:
+// y[n] =   x[n-2]*num[2] + x[n-1]*num[1] + x[n]*num[0]
+//        + y[n-2]*den[2] + y[n-1]*den[1]
+//
+// Default usage example:
+//   s_biquad_to_z_biquad(sgain, fs, 0.0, num, den);
+//
+
+void s_biquad_to_z_biquad(float sgain, float fs_, float kz_, float* num, float* den)
+{
+    float kz = kz_;
+    float fs = fs_;
+    
+    if(kz == 0.0) 
+        kz = 2.0*fs;
+    
+    float kz2 = kz*kz;
+        
+    float B0 = num[2]*sgain;
+    float B1 = num[1]*sgain;
+    float B2 = num[0]*sgain;
+    float A0 = den[2];
+    float A1 = den[1];
+    float A2 = den[0];
+    
+    num[2] = (B0*kz2 + B1*kz + B2)/(A0*kz2+A1*kz+A2);
+    num[1] = (2.0*B2 - 2.0*B0*kz2)/(A0*kz2+A1*kz+A2);
+    num[0] = (B0*kz2 - B1*kz + B2)/(A0*kz2+A1*kz+A2);
+
+    den[2] = -(A0*kz2-A1*kz+A2)/(A0*kz2+A1*kz+A2);      // negated
+    den[1] = -(2.0*A2-2.0*A0*kz2)/(A0*kz2+A1*kz+A2);    // negated
+    den[0] = 0.0;  // should not be used
+    
+}
+

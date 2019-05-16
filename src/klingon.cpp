@@ -40,13 +40,41 @@ klingon* make_klingon(klingon* kot, unsigned int oversample, unsigned int bsz, f
     compute_filter_coeffs_1p(&(kot->anti_alias), LPF1P, kot->clipper_fs, kot->fs/4.0);  // down-play any aliasing artefacts
     compute_filter_coeffs_1p(&(kot->pre_emph482), HPF1P, kot->fs, 482.29);
     compute_filter_coeffs_1p(&(kot->pre_emph589), HPF1P, kot->fs, 589.46);
-    kotstack_init(&(kot->stack), kot->fs);  // Tonestack
 
     // First stage gains
     // ( g482*pre_emph482(x) + g589*pre_emph589(x) )*gain + x
     kot->g482 = 1.0/33.0;  //1/33k resistor ratio
     kot->g589 = 1.0/27.0;  //1/27k resistor ratio
-                          // 1rst stage gain will be 10 to 110
+                          // 1rst stage gain will be 10 to 110    
+
+    // First-stage pre-emphasis, if using other schematic sources
+    // (biquad_pre_emph)*gain + x
+    float k = 1000.0;
+    float n = 1e-9;
+    float r1 = 27*k;
+    float r2 = 33*k;
+    float c1 = 10*n;
+    float c2 = 10*n;
+    
+    float num[3];
+    float den[3];
+
+    compute_s_biquad(r1, r2, c1, c2, num, den);      // s-domain coefficients
+    s_biquad_to_z_biquad(1.0, fs, 0.0, num, den);    // compute bilinear transform
+    kot->pre_emph_biquad.a1 = den[1];
+    kot->pre_emph_biquad.a2 = den[2];
+    kot->pre_emph_biquad.b0 = num[0];
+    kot->pre_emph_biquad.b1 = num[1];
+    kot->pre_emph_biquad.b2 = num[2];
+    kot->pre_emph_biquad.x1 = 0.0;
+    kot->pre_emph_biquad.x2 = 0.0;
+    kot->pre_emph_biquad.y1 = 0.0;
+    kot->pre_emph_biquad.y2 = 0.0;
+    kot->pre_emph_biquad.gain = 1.0;
+    kot->pre_emph_biquad.fs = kot->fs;
+    
+    // Setup KOT tonestack
+    kotstack_init(&(kot->stack), kot->fs);
 
     // Next compute filter cut-offs and inter-stage gains as dependent upon
     // gain pot rotational postion
@@ -81,6 +109,37 @@ void klingon_cleanup(klingon* kot)
 inline float sqr(float x)
 {
     return x*x;
+}
+
+
+//
+// King of Tone, Marshall Bluesbreaker, etc.
+//  First pre-emphasis stage high-pass second-order filter response
+//    (VIN-)-*--/\/\/\/---||---*---||---(Io->)--GND
+//           |    R2      C2   |   C1
+//           *-----/\/\/\/-----*
+//                   R1
+// Transfer function is Io(s)/Vin(s)
+//
+// Default usage example:
+//   compute_s_biquad(r1, r2, c1, c2, num, den);
+//
+
+void compute_s_biquad(float r1, float r2, float c1, float c2, float* num, float* den)
+{
+    float ga = (r1+r2)/(r1*r2);
+    float gs = 1.0/ga;
+    float z0 = 1.0/(r2*c2);
+    float p0 = 1.0/((r1+r2)*c2);
+    
+    num[0] = 0.0;
+    num[1] = ga*p0;
+    num[2] = ga;
+    
+    den[0] = p0/(c1*gs);
+    den[1] = (c1*gs*z0+1.0)/(c1*gs);
+    den[2] = 1.0;
+
 }
 
 //
@@ -256,10 +315,18 @@ void klingon_tick(klingon* kot, float* x)
     // Run pre-emphasis filters
     for(int i = 0; i<n; i++)
     {
-        kot->procbuf[i] = tick_filter_1p(&(kot->pre_emph589), kot->g589*x[i]);
-        kot->procbuf[i] += tick_filter_1p(&(kot->pre_emph482), kot->g482*x[i]);
+    	// "Matsumin" schematic rendering (likely incorrect)
+        //kot->procbuf[i] = tick_filter_1p(&(kot->pre_emph589), kot->g589*x[i]);
+        //kot->procbuf[i] += tick_filter_1p(&(kot->pre_emph482), kot->g482*x[i]);
+        
+        // Other internet source schematic rendering (likely correct due to similarity with Marshall Bluesbreaker)
+        kot->procbuf[i] = tick_filter_biquad(&(kot->pre_emph_biquad), x[i]);
+        
+        // First stage gain
         kot->procbuf[i] *= kot->gain;
         kot->procbuf[i] += x[i];
+        
+        // Second stage pre-emphasis
         x[i] = tick_filter_1p(&(kot->pre_emph159), kot->procbuf[i]);
         kot->procbuf[i] = x[i]*kot->g159;  // Current fed into second op amp inverting terminal
     }
