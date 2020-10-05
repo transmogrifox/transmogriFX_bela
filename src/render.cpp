@@ -6,7 +6,7 @@
 //DEBUG
 //
 
-#include <Scope.h>
+#include <libraries/Scope/Scope.h>
 Scope scope;
 
 //
