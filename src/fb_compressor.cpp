@@ -7,9 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <math_neon.h>
+#include <libraries/math_neon/math_neon.h>
 
 #include "fb_compressor.h"
+
 
 //
 //   Parallel Control                 Feedback Sidechain Works on Envelope
