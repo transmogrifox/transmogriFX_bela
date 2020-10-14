@@ -57,7 +57,7 @@ private:
 
     volatile int16_t  _touch0;
     volatile int16_t  _touch1;
-    bool              _bypass;
+    // bool              _bypass;
     int               _state;
     float             _fsamp;
 
